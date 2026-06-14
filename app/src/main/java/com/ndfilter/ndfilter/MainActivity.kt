@@ -120,20 +120,20 @@ fun NdCalculatorScreen(modifier: Modifier = Modifier) {
             .fillMaxSize()
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = "ND Filter Calculator",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            color = contentColor
+            color = contentColor,
         )
         Spacer(modifier = Modifier.height(16.dp))
 
         // Mode Selector Row
         Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             ModeSelector(isMultiple = isMultipleMode) { 
                 isMultipleMode = it
