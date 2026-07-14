@@ -445,6 +445,12 @@ fun ShutterSpeedDualWheel(
 
 fun getShutterSpeeds(): List<Double> {
     return listOf(
+        1/32000.0,
+        1/25000.0,
+        1/20000.0,
+        1/16000.0,
+        1/13000.0,
+        1/10000.0,
         1/8000.0,
         1/6400.0,
         1/5000.0,
