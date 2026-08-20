@@ -1,5 +1,6 @@
 package com.ndfilter.ndfilter
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +30,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ndfilter.ndfilter.ui.theme.NdFilterTheme
+import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
@@ -57,19 +60,24 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun NdCalculatorScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     var selectedStops by remember { mutableStateOf(setOf(3.0)) } // Start with 3 stops
     var isMultipleMode by remember { mutableStateOf(value = false) }
     val totalStops = selectedStops.sum()
 
-    val shutterSpeeds = remember { getShutterSpeeds() }
+    // Memoize the ND reduction value
+    val ndValue = remember(totalStops) { 2.0.pow(totalStops).roundToInt() }
+
+    // Memoize base speeds once globally
+    val baseSpeeds = remember { SHUTTER_SPEEDS }
     
     // Computed values for the right wheel
     val filteredSpeeds = remember(totalStops) {
-        shutterSpeeds.map { baseSpeed ->
+        baseSpeeds.map { baseSpeed ->
             val raw = baseSpeed * 2.0.pow(totalStops)
             if (raw <= 5.0) {
                 // Find the nearest standard value from the existing list
-                shutterSpeeds.minByOrNull { kotlin.math.abs(it - raw) } ?: raw
+                baseSpeeds.minByOrNull { abs(it - raw) } ?: raw
             } else {
                 // Round to the nearest second
                 raw.roundToInt().toDouble()
@@ -82,9 +90,17 @@ fun NdCalculatorScreen(modifier: Modifier = Modifier) {
         val idx = filteredSpeeds.indexOfFirst { it > 900.0 }
         if (idx == -1) filteredSpeeds.size - 1 else idx
     }
+
+    // Performance Optimization: Pre-format display strings to avoid work during scrolling
+    val baseDisplayStrings = remember {
+        baseSpeeds.map { formatDuration(context, it) }
+    }
+    val filteredDisplayStrings = remember(filteredSpeeds) {
+        filteredSpeeds.map { formatDuration(context, it) }
+    }
     
     // Base index state
-    var baseIndex by remember { mutableIntStateOf(shutterSpeeds.indexOf(1.0/100).coerceAtLeast(0)) }
+    var baseIndex by remember { mutableIntStateOf(baseSpeeds.indexOf(1.0/100).coerceAtLeast(0)) }
     
     // Single shared scroll state for perfect synchronization
     val sharedScrollState = rememberLazyListState(initialFirstVisibleItemIndex = baseIndex)
@@ -114,134 +130,148 @@ fun NdCalculatorScreen(modifier: Modifier = Modifier) {
         }
     }
     
-    val contentColor = MaterialTheme.colorScheme.onBackground
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = stringResource(R.string.header_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = contentColor,
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Mode Selector Row
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val screenHeight = maxHeight
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            ModeSelector(isMultiple = isMultipleMode) { 
-                isMultipleMode = it
-                if (!isMultipleMode && (selectedStops.size > 1)) {
-                    // If switching to single, keep only the largest selected stop
-                    selectedStops = setOfNotNull(selectedStops.maxOrNull())
-                }
-            }
-        }
+            val contentColor = MaterialTheme.colorScheme.onBackground
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        NdMultiSelectRow(
-            label = "",
-            options = listOf(0.5, 1.0, 2.0),
-            selected = selectedStops,
-        ) { value ->
-            selectedStops = if (isMultipleMode) {
-                if (selectedStops.contains(value)) selectedStops - value else selectedStops + value
-            } else {
-                if (selectedStops.contains(value)) emptySet() else setOf(value)
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(10.dp))
-        
-        NdMultiSelectRow(
-            label = "",
-            options = listOf(3.0, 5.0, 10.0),
-            selected = selectedStops,
-        ) { value ->
-            selectedStops = if (isMultipleMode) {
-                if (selectedStops.contains(value)) selectedStops - value else selectedStops + value
-            } else {
-                if (selectedStops.contains(value)) emptySet() else setOf(value)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-        
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onBackground
-            )
-        ) {
+            // Top content: takes only what it needs, but capped to ensure wheel is visible
             Column(
-                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                modifier = Modifier
+                    .heightIn(max = screenHeight * 0.45f)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                val ndValue = 2.0.pow(totalStops).roundToInt()
-                val stopsDisplay = if ((totalStops % 1.0) == 0.0) totalStops.toInt().toString() else totalStops.toString()
                 Text(
-                    text = stringResource(R.string.total_reduction_nd, ndValue),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
+                    text = stringResource(R.string.header_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor,
                 )
-                Text(
-                    text = stringResource(R.string.stops_label, stopsDisplay),
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
+                Spacer(modifier = Modifier.height(1.dp))
 
-        Spacer(modifier = Modifier.height(15.dp))
+                // Mode Selector Row
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    ModeSelector(isMultiple = isMultipleMode) { 
+                        isMultipleMode = it
+                        if (!isMultipleMode && (selectedStops.size > 1)) {
+                            // If switching to single, keep only the largest selected stop
+                            selectedStops = setOfNotNull(selectedStops.maxOrNull())
+                        }
+                    }
+                }
 
-        // Shared Wheel Container
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(modifier = Modifier.width(160.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = stringResource(R.string.base_exposure_label),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = contentColor,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                NdMultiSelectRow(
+                    label = "",
+                    options = listOf(0.5, 1.0, 2.0),
+                    selected = selectedStops,
+                ) { value ->
+                    selectedStops = if (isMultipleMode) {
+                        if (selectedStops.contains(value)) selectedStops - value else selectedStops + value
+                    } else {
+                        if (selectedStops.contains(value)) emptySet() else setOf(value)
+                    }
                 }
                 
-                // Transparent arrow to match the wheel's alignment
-                Text("→", fontSize = 30.sp, color = Color.Transparent)
-
-                Box(modifier = Modifier.width(160.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = stringResource(R.string.filtered_exposure_label),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = contentColor,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                NdMultiSelectRow(
+                    label = "",
+                    options = listOf(3.0, 5.0, 10.0),
+                    selected = selectedStops,
+                ) { value ->
+                    selectedStops = if (isMultipleMode) {
+                        if (selectedStops.contains(value)) selectedStops - value else selectedStops + value
+                    } else {
+                        if (selectedStops.contains(value)) emptySet() else setOf(value)
+                    }
                 }
-            }
-            
-            Spacer(modifier = Modifier.height(15.dp))
 
-            ShutterSpeedDualWheel(
-                baseItems = shutterSpeeds.take(limitIndex + 1),
-                filteredItems = filteredSpeeds.take(limitIndex + 1),
-                state = sharedScrollState,
-                centeredIndex = centeredIndex
-            )
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onBackground
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        val stopsDisplay = if ((totalStops % 1.0) == 0.0) totalStops.toInt().toString() else totalStops.toString()
+                        Text(
+                            text = stringResource(R.string.total_reduction_nd, ndValue),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = stringResource(R.string.stops_label, stopsDisplay),
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(5.dp))
+            }
+
+            // Shared Wheel Container: expands to take ALL remaining space
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 200.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = stringResource(R.string.base_exposure_label),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                    
+                    // Transparent arrow to match the wheel's alignment
+                    Text("→", fontSize = 30.sp, color = Color.Transparent)
+
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = stringResource(R.string.filtered_exposure_label),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(5.dp))
+
+                ShutterSpeedDualWheel(
+                    baseItems = baseDisplayStrings.take(limitIndex + 1),
+                    filteredItems = filteredDisplayStrings.take(limitIndex + 1),
+                    state = sharedScrollState,
+                    centeredIndex = centeredIndex,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }
@@ -361,24 +391,27 @@ fun NdMultiSelectRow(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ShutterSpeedDualWheel(
-    baseItems: List<Double>,
-    filteredItems: List<Double>,
+    baseItems: List<String>,
+    filteredItems: List<String>,
     state: LazyListState,
-    centeredIndex: Int
+    centeredIndex: Int,
+    modifier: Modifier = Modifier
 ) {
     val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState = state)
+    val itemHeight = 80.dp
 
-    Box(
-        modifier = Modifier
-            .height(350.dp)
-            .fillMaxWidth(),
+    BoxWithConstraints(
+        modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
+        val wheelHeight = maxHeight
+        val verticalPadding = if (wheelHeight > itemHeight) (wheelHeight - itemHeight) / 2 else 0.dp
+
         // Shared Highlight middle item
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp),
+                .height(itemHeight),
             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
             shape = MaterialTheme.shapes.small
         ) {}
@@ -387,27 +420,30 @@ fun ShutterSpeedDualWheel(
             state = state,
             flingBehavior = snapFlingBehavior,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 135.dp)
+            contentPadding = PaddingValues(vertical = verticalPadding)
         ) {
-            items(baseItems.size) { index ->
+            items(
+                count = baseItems.size,
+                key = { it } // Performance optimization: Add keys to items
+            ) { index ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(80.dp),
+                        .height(itemHeight),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val isSelected = centeredIndex == index
                     
                     // Base Value
-                    Box(modifier = Modifier.width(160.dp), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Text(
-                            text = formatDuration(baseItems[index]),
+                            text = baseItems[index],
                             style = if (isSelected)
                                 MaterialTheme.typography.headlineSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground,
-                                    fontSize = 40.sp
+                                    fontSize = 30.sp
                                 )
                             else
                                 MaterialTheme.typography.bodyLarge.copy(
@@ -421,14 +457,14 @@ fun ShutterSpeedDualWheel(
                     Text("→", fontSize = 30.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = if (isSelected) 1f else 0.2f))
 
                     // Filtered Value
-                    Box(modifier = Modifier.width(160.dp), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Text(
-                            text = formatDuration(filteredItems[index]),
+                            text = filteredItems[index],
                             style = if (isSelected)
                                 MaterialTheme.typography.headlineSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground,
-                                    fontSize = 40.sp
+                                    fontSize = 30.sp
                                 )
                             else
                                 MaterialTheme.typography.bodyLarge.copy(
@@ -444,84 +480,81 @@ fun ShutterSpeedDualWheel(
     }
 }
 
-fun getShutterSpeeds(): List<Double> {
-    return listOf(
-        1/32000.0,
-        1/25000.0,
-        1/20000.0,
-        1/16000.0,
-        1/13000.0,
-        1/10000.0,
-        1/8000.0,
-        1/6400.0,
-        1/5000.0,
-        1/4000.0,
-        1/3200.0,
-        1/2500.0,
-        1/2000.0,
-        1/1600.0,
-        1/1250.0,
-        1/1000.0,
-        1/800.0,
-        1/640.0,
-        1/500.0,
-        1/400.0,
-        1/320.0,
-        1/250.0,
-        1/200.0,
-        1/160.0,
-        1/125.0,
-        1/100.0,
-        1/80.0,
-        1/60.0,
-        1/50.0,
-        1/40.0,
-        1/30.0,
-        1/25.0,
-        1/20.0,
-        1/15.0,
-        1/13.0,
-        1/10.0,
-        1/8.0,
-        1/6.0,
-        1/5.0,
-        1/4.0,
-        1/3.0,
-        1/2.5,
-        1/2.0,
-        1/1.6,
-        1/1.3,
-        1.0,
-        1.3,
-        1.5,
-        2.0,
-        2.5,
-        3.0,
-        4.0,
-        5.0,
-        6.5,
-        8.0,
-        10.0,
-        13.0,
-        15.0,
-        20.0,
-        25.0,
-        30.0,
-        40.0,
-        50.0,
-        60.0,
-        80.0,
-        100.0,
-        120.0,
-        160.0,
-        200.0,
-        240.0 // 4 min
-    )
-}
+private val SHUTTER_SPEEDS = listOf(
+    1/32000.0,
+    1/25000.0,
+    1/20000.0,
+    1/16000.0,
+    1/13000.0,
+    1/10000.0,
+    1/8000.0,
+    1/6400.0,
+    1/5000.0,
+    1/4000.0,
+    1/3200.0,
+    1/2500.0,
+    1/2000.0,
+    1/1600.0,
+    1/1250.0,
+    1/1000.0,
+    1/800.0,
+    1/640.0,
+    1/500.0,
+    1/400.0,
+    1/320.0,
+    1/250.0,
+    1/200.0,
+    1/160.0,
+    1/125.0,
+    1/100.0,
+    1/80.0,
+    1/60.0,
+    1/50.0,
+    1/40.0,
+    1/30.0,
+    1/25.0,
+    1/20.0,
+    1/15.0,
+    1/13.0,
+    1/10.0,
+    1/8.0,
+    1/6.0,
+    1/5.0,
+    1/4.0,
+    1/3.0,
+    1/2.5,
+    1/2.0,
+    1/1.6,
+    1/1.3,
+    1.0,
+    1.3,
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    4.0,
+    5.0,
+    6.5,
+    8.0,
+    10.0,
+    13.0,
+    15.0,
+    20.0,
+    25.0,
+    30.0,
+    40.0,
+    50.0,
+    60.0,
+    80.0,
+    100.0,
+    120.0,
+    160.0,
+    200.0,
+    240.0 // 4 min
+)
 
-@Composable
-fun formatDuration(seconds: Double): String {
-    if (seconds > 900.0) return stringResource(R.string.duration_limit)
+fun formatDuration(context: Context, seconds: Double): String {
+    if (seconds > 900.0) return context.getString(R.string.duration_limit)
     
     return when {
         seconds >= 0.99 -> {
@@ -532,9 +565,9 @@ fun formatDuration(seconds: Double): String {
                 val totalMinutes = (seconds / 60).toInt()
                 val remainingSeconds = (seconds % 60).roundToInt()
                 if (remainingSeconds == 0) {
-                    stringResource(R.string.duration_m, totalMinutes)
+                    context.getString(R.string.duration_m, totalMinutes)
                 } else {
-                    stringResource(R.string.duration_m_s, totalMinutes, remainingSeconds)
+                    context.getString(R.string.duration_m_s, totalMinutes, remainingSeconds)
                 }
             }
         }
