@@ -19,11 +19,13 @@ android {
 
     signingConfigs {
         create("release") {
-            // You should store these in a secure way (e.g. environment variables or local.properties)
-            // storeFile = file("path/to/your/keystore.jks")
-            // storePassword = "..."
-            // keyAlias = "..."
-            // keyPassword = "..."
+            val keystorePath = System.getenv("KEYSTORE_PATH")
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+            }
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS")
+            keyPassword = System.getenv("KEY_PASSWORD")
         }
     }
 

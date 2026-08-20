@@ -1,6 +1,6 @@
 # Privacy Policy for ND Filter
 
-**Last Updated: February 27, 2025**
+**Last Updated: July 7, 2026**
 
 This Privacy Policy describes how your personal information is handled in the **ND Filter** mobile application (the "App").
 
@@ -25,5 +25,8 @@ Since we do not collect any information, our App is safe for users of all ages, 
 ## 6. Changes to This Policy
 We may update our Privacy Policy from time to time. Any changes will be posted on this page with an updated "Last Updated" date.
 
-## 7. Contact Us
+## 7. Open Source & Transparency
+The source code for this App is available for review at: [https://github.com/albertobeto/NdFilter](https://github.com/albertobeto/NdFilter)
+
+## 8. Contact Us
 If you have any questions about this Privacy Policy, you can contact the developer via email at pics.beto@gmail.com.

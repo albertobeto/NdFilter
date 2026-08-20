@@ -1,3 +1,15 @@
 <resources>
     <string name="app_name">ND Filter</string>
+    <string name="header_title">ND Filter Calculator</string>
+    <string name="mode_single">Single</string>
+    <string name="mode_multiple">Multiple</string>
+    <string name="total_reduction_nd">Total Reduction: ND%1$d</string>
+    <string name="stops_label">%1$s Stops</string>
+    <string name="base_exposure_label">Base Exposure</string>
+    <string name="filtered_exposure_label">Filtered Exposure</string>
+
+    <!-- Duration formatting -->
+    <string name="duration_limit">15+ min</string>
+    <string name="duration_m">%1$dm</string>
+    <string name="duration_m_s">%1$dm %2$ds</string>
 </resources>

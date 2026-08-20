@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -123,7 +124,7 @@ fun NdCalculatorScreen(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "ND Filter Calculator",
+            text = stringResource(R.string.header_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = contentColor,
@@ -188,12 +189,12 @@ fun NdCalculatorScreen(modifier: Modifier = Modifier) {
                 val ndValue = 2.0.pow(totalStops).roundToInt()
                 val stopsDisplay = if ((totalStops % 1.0) == 0.0) totalStops.toInt().toString() else totalStops.toString()
                 Text(
-                    text = "Total Reduction: ND$ndValue",
+                    text = stringResource(R.string.total_reduction_nd, ndValue),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "$stopsDisplay Stops",
+                    text = stringResource(R.string.stops_label, stopsDisplay),
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -211,7 +212,7 @@ fun NdCalculatorScreen(modifier: Modifier = Modifier) {
             ) {
                 Box(modifier = Modifier.width(160.dp), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "Base Exposure",
+                        text = stringResource(R.string.base_exposure_label),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = contentColor,
@@ -224,7 +225,7 @@ fun NdCalculatorScreen(modifier: Modifier = Modifier) {
 
                 Box(modifier = Modifier.width(160.dp), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "Filtered Exposure",
+                        text = stringResource(R.string.filtered_exposure_label),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = contentColor,
@@ -285,7 +286,7 @@ fun ModeSelector(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "Single",
+                        text = stringResource(R.string.mode_single),
                         color = if (!isMultiple) MaterialTheme.colorScheme.onPrimary else Color.White,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
@@ -302,7 +303,7 @@ fun ModeSelector(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "Multiple",
+                        text = stringResource(R.string.mode_multiple),
                         color = if (isMultiple) MaterialTheme.colorScheme.onPrimary else Color.White,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
@@ -518,8 +519,9 @@ fun getShutterSpeeds(): List<Double> {
     )
 }
 
+@Composable
 fun formatDuration(seconds: Double): String {
-    if (seconds > 900.0) return "15+ min"
+    if (seconds > 900.0) return stringResource(R.string.duration_limit)
     
     return when {
         seconds >= 0.99 -> {
@@ -529,7 +531,11 @@ fun formatDuration(seconds: Double): String {
             } else {
                 val totalMinutes = (seconds / 60).toInt()
                 val remainingSeconds = (seconds % 60).roundToInt()
-                if (remainingSeconds == 0) "${totalMinutes}m" else "${totalMinutes}m ${remainingSeconds}s"
+                if (remainingSeconds == 0) {
+                    stringResource(R.string.duration_m, totalMinutes)
+                } else {
+                    stringResource(R.string.duration_m_s, totalMinutes, remainingSeconds)
+                }
             }
         }
         else -> {
